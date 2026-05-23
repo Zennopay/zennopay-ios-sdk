@@ -24,7 +24,7 @@ Full documentation: [docs.zennopay.com](https://docs.zennopay.com)
 In Xcode: **File → Add Package Dependencies…** and paste the repository URL:
 
 ```
-https://github.com/amanpal108/zennopay-ios-sdk
+https://github.com/Zennopay/zennopay-ios-sdk
 ```
 
 Select the `Zennopay` library product and add it to your app target.
@@ -32,7 +32,7 @@ Select the `Zennopay` library product and add it to your app target.
 If you maintain your own `Package.swift`, declare:
 
 ```swift
-.package(url: "https://github.com/amanpal108/zennopay-ios-sdk", from: "0.1.0")
+.package(url: "https://github.com/Zennopay/zennopay-ios-sdk", from: "0.1.0")
 ```
 
 and add `"Zennopay"` to your target's dependencies.
