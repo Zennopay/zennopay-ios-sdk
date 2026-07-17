@@ -95,6 +95,37 @@ actor RESTClient {
         return try await send(request, decode: IntentSnapshot.self, allowRefreshRetry: true)
     }
 
+    /// `GET /v1/payment_intents/:id/receipt`. Reads the authoritative receipt
+    /// for a past payment. Authenticated by the partner-minted RECEIPT token
+    /// (`aud = zennopay-receipt`), carried as `Authorization: Bearer` like every
+    /// other call. Replayable (the token is reusable for polling), so a 401 →
+    /// `refreshSession` (the receipt-token re-mint hook) → retry is always safe.
+    func fetchReceipt() async throws -> ReceiptDTO {
+        let request = makeRequest(path: "receipt", method: "GET", body: nil)
+        return try await send(request, decode: ReceiptDTO.self, allowRefreshRetry: true)
+    }
+
+    /// Poll `GET /:id/receipt` with capped exponential backoff until the receipt
+    /// status is terminal (captured/failed/refunded) or the poll timeout.
+    /// Returns the terminal receipt, or throws `.timedOut`.
+    func pollReceiptUntilTerminal(
+        sleep: @Sendable (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }
+    ) async throws -> ReceiptDTO {
+        let deadline = Date().addingTimeInterval(config.statusPollTimeout)
+        var interval: TimeInterval = 0.5
+        while true {
+            let receipt = try await fetchReceipt()
+            if let status = ReceiptStatus(rawValue: receipt.status), status.isTerminal {
+                return receipt
+            }
+            if Date() >= deadline {
+                throw ZennopayError.timedOut
+            }
+            try await sleep(UInt64(interval * 1_000_000_000))
+            interval = min(interval * 2, config.maxPollInterval)
+        }
+    }
+
     /// Poll `GET /:id` with capped exponential backoff until a terminal status
     /// or the poll timeout. Returns the terminal snapshot, or throws
     /// `.timedOut`.

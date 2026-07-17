@@ -36,6 +36,20 @@ enum CurrencyDisplay {
         }
     }
 
+    /// Normalize a currency code to the numeric ISO-4217 form the display
+    /// helpers expect. Accepts either the numeric code the checkout contract
+    /// uses ("704"/"764"/"840") or an alpha code ("VND"/"THB"/"USD") that the
+    /// receipt endpoint may return. Unknown values pass through unchanged.
+    static func numericCode(from code: String?) -> String? {
+        guard let code, !code.isEmpty else { return nil }
+        switch code.uppercased() {
+        case "704", "VND": return "704"
+        case "764", "THB": return "764"
+        case "840", "USD": return "840"
+        default:           return code
+        }
+    }
+
     /// Short alpha label for a numeric ISO-4217 code.
     static func label(forNumeric code: String?) -> String {
         switch code {

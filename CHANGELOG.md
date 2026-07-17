@@ -2,6 +2,29 @@
 
 All notable changes to the Zennopay iOS SDK are documented here.
 
+## 0.3.0 - 2026-07-18
+
+`presentReceipt` — reopen the authoritative Zennopay receipt for any past
+payment, with live pending/refund status.
+
+### Added
+
+- `Zennopay.presentReceipt(from:intentID:receiptToken:refreshReceiptToken:config:appearance:onDismiss:)`
+  — presents the authoritative receipt for a past payment over your view
+  controller. A captured payment shows the receipt; a refunded payment shows
+  it with refund messaging; a failed payment shows the failure screen; a still
+  -processing payment shows the pending detail and polls until it resolves.
+  Reuses the redesigned receipt screens, appearance theming, and the
+  Powered-by-Zennopay footer.
+- Fetches `GET /v1/payment_intents/:id/receipt`, authenticated by a
+  partner-minted RS256 **receipt token** (`aud = zennopay-receipt`,
+  `sub = partner_user_id`, ≤15-min exp, reusable for polling). A 401 mid-poll
+  triggers `refreshReceiptToken` (if provided) then retries; the backend
+  remains authoritative (401 = bad/expired token, 404 = unknown intent or not
+  this user, with no existence leak).
+
+`presentCheckout` is unchanged and fully source-compatible.
+
 ## 0.2.1 - 2026-07-18
 
 Distribution: the SDK is now publishable to CocoaPods trunk in addition to

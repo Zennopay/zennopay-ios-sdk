@@ -116,6 +116,59 @@ internal enum JWTClaims {
         )
     }
 
+    // MARK: - Receipt token (light, structural decode)
+
+    /// Expected audience for a Zennopay receipt token (`presentReceipt`).
+    static let expectedReceiptAudience = "zennopay-receipt"
+
+    /// The subset of receipt-token claims the SDK peeks at. All optional — the
+    /// backend is authoritative on validity; the SDK only fails fast on a
+    /// structurally broken token so it never makes a doomed receipt call.
+    struct ReceiptTokenClaims: Equatable {
+        let subject: String?
+        let audience: String?
+        let expiresAt: Date?
+    }
+
+    /// Light client-side check for the receipt token: it must be non-empty and
+    /// structurally decode to a JSON claims object. Unlike `validate`, this does
+    /// NOT require an intent-id binding (a receipt token is scoped to the
+    /// partner user, not a single intent) and does NOT reject on expiry or
+    /// audience — a stale token is re-minted via `refreshReceiptToken` on the
+    /// backend's 401, and the backend is the authority on `aud`.
+    ///
+    /// - Throws: `.invalidJWT` when empty, `.malformedToken` when unparseable.
+    static func lightDecodeReceiptToken(_ jwt: String) throws -> ReceiptTokenClaims {
+        guard !jwt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw ZennopayError.invalidJWT
+        }
+        let segments = jwt.split(separator: ".", omittingEmptySubsequences: false)
+        guard segments.count == 3 else { throw ZennopayError.malformedToken }
+
+        let payloadSegment = String(segments[1])
+        guard !payloadSegment.isEmpty,
+              let payloadData = base64URLDecode(payloadSegment),
+              let json = try? JSONSerialization.jsonObject(with: payloadData, options: []),
+              let claims = json as? [String: Any] else {
+            throw ZennopayError.malformedToken
+        }
+
+        let expiresAt: Date?
+        if let expInt = claims["exp"] as? Int {
+            expiresAt = Date(timeIntervalSince1970: Double(expInt))
+        } else if let expDouble = claims["exp"] as? Double {
+            expiresAt = Date(timeIntervalSince1970: expDouble)
+        } else {
+            expiresAt = nil
+        }
+
+        return ReceiptTokenClaims(
+            subject: claims["sub"] as? String,
+            audience: claims["aud"] as? String,
+            expiresAt: expiresAt
+        )
+    }
+
     // MARK: - base64url
 
     /// Decode a base64url string (no padding, `-`/`_` for `+`/`/`).

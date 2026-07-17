@@ -1439,6 +1439,9 @@ struct ReceiptScreen: View {
 
     private var theme: ZTheme { vm.theme }
     private var receipt: CheckoutViewModel.Receipt? { vm.receipt }
+    /// True when reopened via `presentReceipt` and the payment was refunded —
+    /// the debit happened then was returned, so the receipt swaps to refund copy.
+    private var isRefunded: Bool { vm.receiptDisplayStatus == .refunded }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1452,7 +1455,7 @@ struct ReceiptScreen: View {
                 .accessibilityLabel("Share receipt")
             }
             ScrollView(showsIndicators: false) {
-                receiptCard
+                ReceiptCardBody(theme: theme, receipt: receipt, isRefunded: isRefunded, entered: entered)
                     .padding(.horizontal, ZTokens.md)
                     .padding(.top, ZTokens.sm)
             }
@@ -1471,23 +1474,78 @@ struct ReceiptScreen: View {
         }
     }
 
-    private var receiptCard: some View {
+    static func timestampString(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "MMMM d, yyyy, h:mm:ss a"
+        return f.string(from: date)
+    }
+
+    private func share() {
+        #if canImport(UIKit) && os(iOS)
+        guard let r = receipt else { return }
+        var lines = ["Payment successful"]
+        if let minor = r.localMinorUnits {
+            lines.append(CurrencyDisplay.formatMinorWithLabel(minor, numeric: r.localCurrency))
+        }
+        lines.append("Paid: \(CurrencyDisplay.formatUSDCents(r.usdCents))")
+        lines.append("Merchant: \(r.merchantName)")
+        if let account = r.accountMasked { lines.append("Account: \(account)") }
+        lines.append("Transaction: \(r.transactionID ?? r.intentID)")
+        if !r.purpose.isEmpty { lines.append("Purpose: \(r.purpose)") }
+        lines.append("Date: \(Self.timestampString(r.timestamp))")
+        let activity = UIActivityViewController(
+            activityItems: [lines.joined(separator: "\n")], applicationActivities: nil
+        )
+        var top = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .first?.rootViewController
+        while let presented = top?.presentedViewController { top = presented }
+        top?.present(activity, animated: true)
+        #endif
+    }
+}
+
+/// The receipt card body (green check / refund glyph, status title, timestamp,
+/// LOCAL amount hero, and the merchant / account / transaction / paid rows).
+/// Extracted from `ReceiptScreen` so it renders both inside the scroll view AND
+/// directly (SwiftUI previews / offscreen `ImageRenderer` QA, which does not
+/// rasterize `ScrollView` content). Pure display — no view model, no side
+/// effects — fed the same `Receipt` model on the checkout and receipt-reopen
+/// paths alike.
+@available(iOS 14.0, macOS 13.0, *)
+struct ReceiptCardBody: View {
+    let theme: ZTheme
+    let receipt: CheckoutViewModel.Receipt?
+    var isRefunded: Bool = false
+    var entered: Bool = true
+
+    var body: some View {
         VStack(spacing: ZTokens.md) {
-            Image(systemName: "checkmark.circle.fill")
+            Image(systemName: isRefunded ? "arrow.uturn.left.circle.fill" : "checkmark.circle.fill")
                 .font(.system(size: 56))
-                .foregroundColor(theme.success)
+                .foregroundColor(isRefunded ? theme.pending : theme.success)
                 .scaleEffect(entered ? 1 : 0.8)
                 .opacity(entered ? 1 : 0)
                 .padding(.top, ZTokens.lg)
-            Text("Payment successful")
+            Text(isRefunded ? "Payment refunded" : "Payment successful")
                 .zpFont(theme, 20, .bold)
-                .foregroundColor(theme.success)
+                .foregroundColor(isRefunded ? theme.pending : theme.success)
                 .accessibilityIdentifier("zp.result.title")
             if let r = receipt {
-                Text(Self.timestampString(r.timestamp))
+                Text(ReceiptScreen.timestampString(r.timestamp))
                     .zpFont(theme, 14)
                     .monospacedDigit()
                     .foregroundColor(theme.text2)
+                if isRefunded {
+                    Text("This payment was refunded to your wallet.")
+                        .zpFont(theme, 14)
+                        .foregroundColor(theme.text2)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, ZTokens.md)
+                        .accessibilityIdentifier("zp.receipt.refundNote")
+                }
                 if let minor = r.localMinorUnits {
                     Text(CurrencyDisplay.formatMinorWithLabel(minor, numeric: r.localCurrency))
                         .zpFont(theme, 34, .bold, hero: true)
@@ -1540,37 +1598,6 @@ struct ReceiptScreen: View {
         .padding(.top, ZTokens.sm)
         // One VoiceOver element per row: "Merchant name, Cà Phê Sài Gòn".
         .accessibilityElement(children: .combine)
-    }
-
-    static func timestampString(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US")
-        f.dateFormat = "MMMM d, yyyy, h:mm:ss a"
-        return f.string(from: date)
-    }
-
-    private func share() {
-        #if canImport(UIKit) && os(iOS)
-        guard let r = receipt else { return }
-        var lines = ["Payment successful"]
-        if let minor = r.localMinorUnits {
-            lines.append(CurrencyDisplay.formatMinorWithLabel(minor, numeric: r.localCurrency))
-        }
-        lines.append("Paid: \(CurrencyDisplay.formatUSDCents(r.usdCents))")
-        lines.append("Merchant: \(r.merchantName)")
-        if let account = r.accountMasked { lines.append("Account: \(account)") }
-        lines.append("Transaction: \(r.transactionID ?? r.intentID)")
-        if !r.purpose.isEmpty { lines.append("Purpose: \(r.purpose)") }
-        lines.append("Date: \(Self.timestampString(r.timestamp))")
-        let activity = UIActivityViewController(
-            activityItems: [lines.joined(separator: "\n")], applicationActivities: nil
-        )
-        var top = UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
-            .first?.rootViewController
-        while let presented = top?.presentedViewController { top = presented }
-        top?.present(activity, animated: true)
-        #endif
     }
 }
 

@@ -47,6 +47,22 @@ final class CheckoutViewModel: ObservableObject {
     /// When the confirm was accepted (drives the receipt timestamp fallback).
     private(set) var confirmedAt: Date?
 
+    // MARK: Receipt mode (presentReceipt)
+
+    /// Non-nil when the VM is driving the `presentReceipt` flow (reopening a
+    /// past payment's authoritative receipt). Drives the receipt success/refund
+    /// copy on `ReceiptScreen`. Nil in the normal checkout flow.
+    @Published private(set) var receiptDisplayStatus: ReceiptStatus?
+
+    /// Masked account (last-4) from the receipt endpoint's merchant block. The
+    /// backend has already masked it, so it is shown verbatim (not re-masked
+    /// through the QR peek). Preferred over `qrPeek?.accountMasked` when set.
+    private(set) var injectedAccountMasked: String?
+
+    /// A client-side error to surface immediately in receipt mode (e.g. a
+    /// structurally invalid receipt token) without making a network call.
+    var receiptPreflightError: ZennopayError?
+
     // MARK: Dependencies
 
     let intentID: String
@@ -295,6 +311,133 @@ final class CheckoutViewModel: ObservableObject {
         await pollForResult()
     }
 
+    // MARK: - Receipt flow (presentReceipt)
+
+    /// Drive the `presentReceipt` flow: fetch the authoritative receipt for a
+    /// past payment and render the terminal receipt/failure/refund screen. A
+    /// `pending` receipt shows the pending-detail screen and polls until it goes
+    /// terminal, then swaps to the resolved screen. A structurally invalid token
+    /// (or any load failure) lands on the failure screen with a Done that
+    /// dismisses. Reuses the existing terminal screens verbatim.
+    func runReceiptFlow(preflightError: ZennopayError? = nil) async {
+        guard !isFrozen else { return }
+        // Already terminal (e.g. seeded for a static render) — nothing to fetch.
+        if case .finished = state { return }
+
+        if let preflightError {
+            finish(.failed(intentID: intentID, error: preflightError))
+            return
+        }
+
+        do {
+            let dto = try await client.fetchReceipt()
+            applyReceipt(dto)
+            guard let status = dto.receiptStatus else {
+                finish(.failed(intentID: intentID, error: .serverError(status: 200, code: "unknown_receipt_status")))
+                return
+            }
+            if status.isTerminal {
+                finishReceipt(status: status)
+            } else {
+                // Pending: show the pending-detail screen while we poll.
+                state = .finished(.pending(intentID: intentID))
+                await pollReceipt()
+            }
+        } catch let error as ZennopayError {
+            finish(.failed(intentID: intentID, error: error))
+        } catch {
+            finish(.failed(intentID: intentID, error: .networkError(underlying: String(describing: error))))
+        }
+    }
+
+    private func pollReceipt() async {
+        do {
+            let dto = try await client.pollReceiptUntilTerminal()
+            applyReceipt(dto)
+            finishReceipt(status: dto.receiptStatus ?? .failed)
+        } catch let error as ZennopayError {
+            // A lapsed poll budget is still PENDING — keep the pending screen up
+            // (the payment may yet settle; the backend auto-refunds otherwise).
+            if error == .timedOut {
+                state = .finished(.pending(intentID: intentID))
+            } else {
+                finish(.failed(intentID: intentID, error: error))
+            }
+        } catch {
+            state = .finished(.pending(intentID: intentID))
+        }
+    }
+
+    /// Collapse a terminal receipt status onto the terminal screens. `refunded`
+    /// renders the receipt with refund messaging (the debit did happen, then was
+    /// returned) rather than a failure.
+    private func finishReceipt(status: ReceiptStatus) {
+        receiptDisplayStatus = status
+        switch status {
+        case .captured, .refunded:
+            finish(.completed(intentID: intentID))
+        case .failed:
+            finish(.failed(intentID: intentID, error: .paymentFailed))
+        case .pending:
+            state = .finished(.pending(intentID: intentID))
+        }
+    }
+
+    /// Map the receipt DTO onto the display model the terminal screens read
+    /// (`receiptSnapshot` + injected account + corridor + timestamp).
+    private func applyReceipt(_ dto: ReceiptDTO) {
+        let numeric = CurrencyDisplay.numericCode(from: dto.local_currency)
+        receiptSnapshot = IntentSnapshot(
+            id: dto.intent_id,
+            status: dto.status,
+            amount_usd_cents: dto.amount_usd_cents,
+            corridor: dto.corridor,
+            merchant: IntentSnapshot.ConfirmMerchant(
+                scheme: nil,
+                name: dto.merchant?.name,
+                city: nil,
+                country: dto.merchant?.country,
+                mcc: nil,
+                currency_numeric: numeric
+            ),
+            qr_kind: nil,
+            quote_id: nil,
+            quote_version: nil,
+            quote_local_amount_minor_units: dto.local_amount_minor_units,
+            quote_local_currency: numeric,
+            quote_expires_at: nil,
+            confirm_state: nil,
+            beneficiary: nil,
+            transaction_id: dto.transaction_ref,
+            created_at: dto.created_at,
+            updated_at: dto.updated_at
+        )
+        injectedAccountMasked = dto.merchant?.account_no
+        if let corridor = dto.corridor, !corridor.isEmpty { self.corridor = corridor }
+        confirmedAt = dto.updated_at.flatMap(Self.parseISO8601)
+            ?? dto.created_at.flatMap(Self.parseISO8601)
+            ?? Date()
+        // A failed receipt was not debited (or already refunded); everything
+        // else means money did move — drives the refund reassurance copy.
+        walletDebited = dto.receiptStatus != .failed
+        receiptDisplayStatus = dto.receiptStatus
+    }
+
+    #if DEBUG
+    /// DEBUG-ONLY: seed a fully-formed receipt for static rendering / gallery
+    /// screenshots — no network, no money movement. Mirrors `debugApply`.
+    func debugApplyReceipt(_ dto: ReceiptDTO) {
+        debugFrozen = true
+        applyReceipt(dto)
+        let status = dto.receiptStatus ?? .captured
+        switch status {
+        case .captured, .refunded: state = .finished(.completed(intentID: intentID))
+        case .failed:              state = .finished(.failed(intentID: intentID, error: .paymentFailed))
+        case .pending:             state = .finished(.pending(intentID: intentID))
+        }
+    }
+    #endif
+
     /// Retry after a failed result (result screen "Try again"). Reuses the same
     /// idempotency key so the backend dedupes.
     func retry() async {
@@ -437,7 +580,7 @@ final class CheckoutViewModel: ObservableObject {
             transactionID: snap?.transaction_id,
             intentID: intentID,
             bankName: qrPeek?.bankName,
-            accountMasked: qrPeek?.accountMasked,
+            accountMasked: injectedAccountMasked ?? qrPeek?.accountMasked,
             purpose: purposeText.trimmingCharacters(in: .whitespacesAndNewlines),
             timestamp: timestamp,
             corridor: snap?.corridor ?? corridor

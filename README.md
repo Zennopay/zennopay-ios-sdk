@@ -34,7 +34,7 @@ to your app target. Or, in your own `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Zennopay/zennopay-ios-sdk", from: "0.2.0")
+    .package(url: "https://github.com/Zennopay/zennopay-ios-sdk", from: "0.3.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: ["Zennopay"])
@@ -96,6 +96,41 @@ death can never double-debit.
 `networkError`, …). On `.timedOut` the payment is effectively *pending* — it
 may still settle; reconcile via your webhook or `GET /v1/payment_intents/:id`
 rather than assuming a terminal failure.
+
+### Reopen a receipt
+
+Show the **authoritative** Zennopay receipt for a past payment — with live
+pending/refund status — from anywhere in your app (an order history row, a
+push-notification tap). Mint a short-lived **receipt token** on your backend
+(the same signing key as your session endpoint, but `aud = zennopay-receipt`,
+`sub = <partner_user_id>`, ≤15-min exp — reusable so the SDK can poll) and
+hand it to the app alongside the intent id:
+
+```swift
+import Zennopay
+
+Zennopay.presentReceipt(
+    from: self,                          // host UIViewController
+    intentID: order.intentId,
+    receiptToken: order.receiptToken,    // minted by your backend (aud=zennopay-receipt)
+    refreshReceiptToken: { intentID in
+        // Called on token expiry (401): re-mint a fresh receipt token, or nil.
+        try? await api.mintReceiptToken(for: intentID)
+    },
+    config: .staging                     // .production for live traffic
+) {
+    // Called after the user taps Done / close (or the token failed to load).
+}
+```
+
+The SDK fetches the receipt and renders the terminal screen for you: a
+**captured** payment shows the receipt, a **refunded** payment shows it with
+refund messaging, a **failed** payment shows the failure screen, and a
+still-**pending** payment shows the processing detail and polls until it goes
+terminal. Like `presentCheckout`, your API keys never ship in the app — only
+the short-lived, per-user receipt token does. The backend is authoritative:
+a 404 is returned for an unknown intent *or* one that isn't this user's, with
+no existence leak.
 
 ### Environments
 
