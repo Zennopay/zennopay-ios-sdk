@@ -1,143 +1,154 @@
 # Zennopay iOS SDK
 
-Official iOS SDK for [Zennopay](https://zennopay.com) cross-border QR payments.
-A thin, dependency-free wrapper that lets a partner app (e.g. Wizz) hand off a
-payment intent to the Zennopay hosted checkout. Modeled on the Stripe Checkout
-pattern, it opens the checkout URL in a system browser tab via
-`ASWebAuthenticationSession` so the user always sees a real URL bar and an
-Apple-mediated consent sheet. When checkout completes, the browser redirects
-back to the partner app via a registered URL scheme and the SDK surfaces a
-typed `PaymentResult`.
+The iOS SDK for [Zennopay](https://zennopay.com) — let your app's users scan
+local merchant QR codes abroad and pay from their wallet balance.
 
-Full documentation: [docs.zennopay.com](https://docs.zennopay.com)
+The SDK presents the **PaymentSheet**: the full native pay experience — QR
+scan → amount + FX quote → slide-to-pay → result — modally over your view
+controller, and delivers exactly one typed `PaymentResult` to your callback.
+It is SwiftUI under the hood, dependency-free, and works from both UIKit and
+SwiftUI hosts.
+
+Full documentation: [Zennopay/zennopay-docs](https://github.com/Zennopay/zennopay-docs)
 
 ## Requirements
 
-- iOS 13.0+
-- Swift 5.9+
-- No third-party dependencies (only Foundation + AuthenticationServices)
+- iOS 16.0+ (the presented flow uses modern SwiftUI APIs)
+- Swift 5.9+ / Xcode 15+
+- No third-party dependencies
+- A backend session endpoint that creates the payment intent and mints the
+  short-lived session JWT (your API keys never ship in the app)
 
 ## Installation
 
 ### Swift Package Manager
 
-In Xcode: **File → Add Package Dependencies…** and paste the repository URL:
+In Xcode: **File → Add Package Dependencies…** and paste:
 
 ```
 https://github.com/Zennopay/zennopay-ios-sdk
 ```
 
-Select the `Zennopay` library product and add it to your app target.
-
-If you maintain your own `Package.swift`, declare:
+Select **Up to Next Major Version**, then add the `Zennopay` library product
+to your app target. Or, in your own `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/Zennopay/zennopay-ios-sdk", from: "0.1.0")
+dependencies: [
+    .package(url: "https://github.com/Zennopay/zennopay-ios-sdk", from: "0.2.0")
+],
+targets: [
+    .target(name: "YourApp", dependencies: ["Zennopay"])
+]
 ```
 
-and add `"Zennopay"` to your target's dependencies.
+### Declare camera usage
 
-## URL scheme registration
-
-The SDK delivers the payment result by redirecting from the checkout web to a
-URL scheme your app owns. Register it in your `Info.plist`:
+The sheet opens on a live camera scanner. iOS reads the permission prompt's
+usage string from **your** app bundle, so add to your `Info.plist`:
 
 ```xml
-<key>CFBundleURLTypes</key>
-<array>
-  <dict>
-    <key>CFBundleURLName</key>
-    <string>com.wizz.payment-result</string>
-    <key>CFBundleURLSchemes</key>
-    <array>
-      <string>wizz</string>
-    </array>
-  </dict>
-</array>
+<key>NSCameraUsageDescription</key>
+<string>Scan a merchant QR code to pay.</string>
 ```
 
-The redirect URL the checkout web will fire is
-`wizz://payment-result?intent_id=...&status=...`. You do not need to handle
-this URL in your `SceneDelegate` / `AppDelegate` — `ASWebAuthenticationSession`
-captures it before it reaches the OS routing layer and delivers it directly to
-the SDK's completion handler.
+If the user denies camera access (or the device has no camera), the sheet
+automatically falls back to a paste-QR-data field — the flow is always
+completable without a camera.
 
-## Usage
+## Quickstart
+
+Fetch a checkout session (intent id + session JWT) from your backend, then
+present the sheet:
 
 ```swift
 import Zennopay
 
-Zennopay.openCheckout(
-    intentID: "zp_abc123",
-    jwt: jwtFromBackend,
-    returnScheme: "wizz"
+Zennopay.presentCheckout(
+    from: self,                          // host UIViewController
+    intentID: session.intentId,
+    sessionJWT: session.sessionJwt,
+    refreshSession: { intentID in
+        // Called on session expiry (401): re-mint a fresh JWT for the
+        // SAME intent from your backend, or return nil if you can't.
+        try? await api.refreshSessionJWT(for: intentID)
+    },
+    config: .staging                     // .production for live traffic
 ) { result in
     switch result {
-    case .success(let r):
-        print("Payment \(r.status) for intent \(r.intentID)")
-    case .failure(let e):
-        print("Error: \(e)")
+    case .completed(let intentID):
+        showReceipt(intentID: intentID)  // money moved — debit your ledger
+    case .canceled:
+        break                            // user backed out; no money moved
+    case .failed(let intentID, let error):
+        log("payment failed", intentID, error)
     }
 }
 ```
 
-The completion handler is delivered on the main queue.
+The SDK validates the JWT's structure, expiry, and intent binding **before**
+presenting any UI, so a mis-paired token fails fast with `.failed` instead
+of an empty sheet. Slide-to-pay fires the confirm exactly once — the
+idempotency key is persisted before the network call, so retries and process
+death can never double-debit.
 
-### Async/await
+`ZennopayError` is a typed taxonomy (`invalidJWT`, `intentMismatch`,
+`jwtExpired`, `sessionExpired`, `quoteExpired`, `paymentFailed`, `timedOut`,
+`networkError`, …). On `.timedOut` the payment is effectively *pending* — it
+may still settle; reconcile via your webhook or `GET /v1/payment_intents/:id`
+rather than assuming a terminal failure.
 
-A Swift Concurrency variant is also available:
+### Environments
 
-```swift
-do {
-    let result = try await Zennopay.openCheckout(
-        intentID: "zp_abc123",
-        jwt: jwtFromBackend,
-        returnScheme: "wizz"
-    )
-    print("Payment \(result.status) for intent \(result.intentID)")
-} catch {
-    print("Error: \(error)")
-}
-```
-
-## How it works
-
-1. The host's backend exchanges its Zennopay API key for a short-lived JWT
-   scoped to one `intent_id`.
-2. The host calls `Zennopay.openCheckout(...)` with that JWT.
-3. The SDK verifies the JWT's `intent_id` claim matches the call site's
-   `intentID` argument before opening the browser. Mismatch raises
-   `ZennopayError.invalidJWT` synchronously.
-4. The SDK opens `https://checkout.zennopay.com/flow/{intent_id}/scan#token={jwt}`
-   in `ASWebAuthenticationSession`. The token rides in the URL **fragment**
-   (after `#`), so it is never sent to the HTTP server in logs or to proxies.
-5. The user completes (or cancels) checkout in the system browser.
-6. The checkout web redirects to `wizz://payment-result?intent_id=...&status=...`.
-7. The SDK parses the redirect and calls your completion handler with a
-   `PaymentResult` (or a `ZennopayError`).
-
-## Result + error types
+`ZennopayConfig` selects the environment. It is a value, never a code path:
 
 ```swift
-public enum PaymentStatus: String { case success, failed, canceled, pending }
-
-public struct PaymentResult {
-    public let intentID: String
-    public let status: PaymentStatus
-}
-
-public enum ZennopayError: Error {
-    case invalidJWT
-    case userCanceled
-    case returnURLMalformed
-    case presentationAnchorMissing
-    case networkError(Error)
-}
+config: .staging       // https://api.staging.zennopay.com — SANDBOX pill shown (default)
+config: .production    // https://api.zennopay.com — real money, no sandbox chrome
+config: ZennopayConfig(apiBaseURL: URL(string: "http://localhost:3000")!)  // custom gateway
 ```
 
-`.pending` means the checkout web could not synchronously confirm the
-outcome (async settlement, provider review, etc.). The host should poll the
-intent or wait for a webhook for the final state.
+### Theming
+
+`ZennopayAppearance` themes the sheet to match your app — colors, corner
+radii, font, primary button, and an optional logo in the sheet header:
+
+```swift
+var appearance = ZennopayAppearance()
+appearance.colors.primary = UIColor(named: "BrandGreen")!
+appearance.primaryButton = .init(
+    background: UIColor(named: "BrandGreen")!,
+    textColor: .white,
+    cornerRadius: 10
+)
+appearance.logo = UIImage(named: "wordmark")
+```
+
+Pass nothing for the default Zennopay look, following system light/dark.
+Structural rules are not overridable: radii are clamped to ≤ 12 pt, amounts
+always render in tabular figures, and the accent color is reserved for state
+signals.
+
+## Testing
+
+The Simulator has no camera — the sheet swaps in the paste-QR fallback
+automatically; paste any VietQR/EMVCo payload string and the flow proceeds
+identically (the backend does the authoritative parse either way). On a
+physical device, camera scanning and the runtime-permission prompt are the
+pre-release checklist.
+
+## Versioning
+
+Zennopay SDKs follow [semver](https://semver.org). `v0.x` releases are
+pre-GA: minor versions may contain breaking API changes, called out in the
+[CHANGELOG](CHANGELOG.md).
+
+All four Zennopay SDKs — iOS,
+[Android](https://github.com/Zennopay/zennopay-android-sdk),
+[Flutter](https://github.com/Zennopay/zennopay-flutter), and
+[React Native](https://github.com/Zennopay/zennopay-react-native) — release
+in lockstep: the same `vX.Y.Z` tag and GitHub Release is cut in each repo
+per release. These standalone repos are release mirrors (squashed release
+commits, not full development history).
 
 ## License
 
