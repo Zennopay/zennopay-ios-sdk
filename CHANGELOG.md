@@ -2,6 +2,19 @@
 
 All notable changes to the Zennopay iOS SDK are documented here.
 
+## 0.2.1 - 2026-07-18
+
+Distribution: the SDK is now publishable to CocoaPods trunk in addition to
+Swift Package Manager. No API changes.
+
+### Added
+
+- `Zennopay.podspec` for CocoaPods (`pod 'Zennopay'`), unblocking the React
+  Native and Flutter bridges whose iOS sides depend on the pod.
+- `Bundle.module` resolution shim (guarded by `!SWIFT_PACKAGE`) so the
+  "Powered by Zennopay" asset catalog loads under both SwiftPM and CocoaPods.
+  Under CocoaPods the assets ship in a `ZennopayResources` resource bundle.
+
 ## 0.2.0 - 2026-07-17
 
 The PaymentSheet release: the SDK now renders the entire native pay
