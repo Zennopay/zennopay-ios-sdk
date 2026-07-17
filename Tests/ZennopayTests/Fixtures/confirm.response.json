@@ -1,0 +1,44 @@
+{
+  "id": "98d814dc-d23e-4461-8d16-a5b594a0cafb",
+  "partner_id": "partner_demo",
+  "partner_user_id": "u",
+  "amount_usd_cents": 1000,
+  "corridor": "vn_vietqr",
+  "status": "captured",
+  "provider_quote_id": null,
+  "provider_local_amount_minor_units": null,
+  "provider_local_currency": null,
+  "idempotency_key": null,
+  "beneficiary": {
+    "scheme": "vietqr",
+    "merchant_account_tag": "38",
+    "aid": "A000000727",
+    "account_sub_tags": {
+      "00": "A000000727",
+      "01": "0006970436"
+    },
+    "merchant_name": "PHO HANOI 24",
+    "merchant_city": "HANOI",
+    "country": "VN",
+    "currency_numeric": "704",
+    "mcc": "5814"
+  },
+  "merchant": {
+    "scheme": "vietqr",
+    "name": "PHO HANOI 24",
+    "city": "HANOI",
+    "country": "VN",
+    "mcc": "5814",
+    "currency_numeric": "704"
+  },
+  "qr_kind": "dynamic",
+  "qr_amount_minor_units": 25000000,
+  "quote_id": "stubq_1622298e-1f78-4329-96d0-b76b721f4e93",
+  "quote_version": 1,
+  "quote_local_amount_minor_units": 25000000,
+  "quote_local_currency": "704",
+  "quote_expires_at": 1782908883452,
+  "confirm_state": "done",
+  "created_at": "2026-07-01T12:27:03.450Z",
+  "updated_at": "2026-07-01T12:27:03.453Z"
+}

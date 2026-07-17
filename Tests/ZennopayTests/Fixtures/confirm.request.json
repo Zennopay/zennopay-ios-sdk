@@ -1,0 +1,12 @@
+{
+  "method": "POST",
+  "path": "/v1/payment_intents/{id}/confirm",
+  "auth": "Authorization: Bearer <session-JWT> (jti CONSUMED — single use)",
+  "headers": {
+    "Idempotency-Key": "<uuid>"
+  },
+  "body": {
+    "quote_id": "stubq_1622298e-1f78-4329-96d0-b76b721f4e93",
+    "quote_version": 1
+  }
+}

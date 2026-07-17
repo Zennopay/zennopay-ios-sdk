@@ -1,0 +1,8 @@
+{
+  "method": "POST",
+  "path": "/v1/payment_intents/{id}/scan",
+  "auth": "Authorization: Bearer <session-JWT> (jti NOT consumed)",
+  "body": {
+    "qr_payload": "00020101021238280010A0000007270110000697043652045814530370454062500005802VN5912PHO HANOI 246005HANOI6304B11E"
+  }
+}

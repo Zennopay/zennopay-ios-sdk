@@ -1,0 +1,20 @@
+{
+  "intent_id": "98d814dc-d23e-4461-8d16-a5b594a0cafb",
+  "status": "created",
+  "merchant": {
+    "scheme": "vietqr",
+    "name": "PHO HANOI 24",
+    "city": "HANOI",
+    "country": "VN",
+    "mcc": "5814"
+  },
+  "qr_kind": "dynamic",
+  "quote": {
+    "quote_id": "stubq_1622298e-1f78-4329-96d0-b76b721f4e93",
+    "quote_version": 1,
+    "amount_usd_cents": 1000,
+    "local_amount_minor_units": 25000000,
+    "local_currency": "704",
+    "expires_at": 1782908883452
+  }
+}
