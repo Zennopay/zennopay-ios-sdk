@@ -39,6 +39,6 @@ public struct ZennopayConfig: Sendable {
     /// backend use on staging. Override via `presentCheckout(..., config:)` for
     /// prod or local development.
     public static let staging = ZennopayConfig(
-        apiBaseURL: URL(string: "https://api.staging.zennopay.com")!
+        apiBaseURL: URL(string: "https://api.staging.zennopay.in")!
     )
 }

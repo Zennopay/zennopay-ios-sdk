@@ -177,7 +177,7 @@ final class ReceiptTokenValidationTests: XCTestCase {
 
 final class ReceiptRESTClientTests: XCTestCase {
 
-    private let config = ZennopayConfig(apiBaseURL: URL(string: "https://api.test.zennopay.com")!)
+    private let config = ZennopayConfig(apiBaseURL: URL(string: "https://api.test.zennopay.in")!)
 
     static func receiptJSON(status: String) -> Data {
         """
@@ -283,7 +283,7 @@ final class ReceiptRESTClientTests: XCTestCase {
 @MainActor
 final class ReceiptFlowViewModelTests: XCTestCase {
 
-    private let config = ZennopayConfig(apiBaseURL: URL(string: "https://api.test.zennopay.com")!)
+    private let config = ZennopayConfig(apiBaseURL: URL(string: "https://api.test.zennopay.in")!)
 
     private func makeVM(transport: HTTPTransport, refresh: (@Sendable (String) async -> String?)? = nil,
                         onResult: @escaping (PaymentResult) -> Void = { _ in }) -> CheckoutViewModel {

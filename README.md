@@ -1,6 +1,6 @@
 # Zennopay iOS SDK
 
-The iOS SDK for [Zennopay](https://zennopay.com) — let your app's users scan
+The iOS SDK for [Zennopay](https://zennopay.in) — let your app's users scan
 local merchant QR codes abroad and pay from their wallet balance.
 
 The SDK presents the **PaymentSheet**: the full native pay experience — QR
@@ -34,7 +34,7 @@ to your app target. Or, in your own `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Zennopay/zennopay-ios-sdk", from: "0.3.0")
+    .package(url: "https://github.com/Zennopay/zennopay-ios-sdk", from: "0.5.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: ["Zennopay"])
@@ -137,8 +137,8 @@ no existence leak.
 `ZennopayConfig` selects the environment. It is a value, never a code path:
 
 ```swift
-config: .staging       // https://api.staging.zennopay.com — SANDBOX pill shown (default)
-config: .production    // https://api.zennopay.com — real money, no sandbox chrome
+config: .staging       // https://api.staging.zennopay.in — SANDBOX pill shown (default)
+config: .production    // https://api.zennopay.in — real money, no sandbox chrome
 config: ZennopayConfig(apiBaseURL: URL(string: "http://localhost:3000")!)  // custom gateway
 ```
 

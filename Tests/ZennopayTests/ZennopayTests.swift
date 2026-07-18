@@ -503,7 +503,7 @@ final class ErrorTaxonomyTests: XCTestCase {
 
 final class RESTClientTests: XCTestCase {
 
-    private let config = ZennopayConfig(apiBaseURL: URL(string: "https://api.test.zennopay.com")!)
+    private let config = ZennopayConfig(apiBaseURL: URL(string: "https://api.test.zennopay.in")!)
 
     func test_scan_sendsRawPayload_andDecodesQuote() async throws {
         let stub = StubTransport { request in

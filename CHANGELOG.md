@@ -2,6 +2,11 @@
 
 All notable changes to the Zennopay iOS SDK are documented here.
 
+## 0.5.0 - 2026-07-18
+
+Version-aligned across all SDKs; API domain zennopay.com → zennopay.in
+(canonical). No API changes.
+
 ## 0.3.0 - 2026-07-18
 
 `presentReceipt` — reopen the authoritative Zennopay receipt for any past
