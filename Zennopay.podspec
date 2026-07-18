@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = "Zennopay"
-  s.version          = "0.5.0"
+  s.version          = "0.6.0"
   s.summary          = "Scan a local merchant QR code abroad and pay it from your wallet — native iOS checkout."
   s.description      = <<-DESC
     Zennopay's native iOS SDK. Presents a full in-process pay experience:

@@ -38,7 +38,7 @@ public enum Zennopay {
     ///     light/dark). Defaults to `.default` (the `DESIGN.md` bank-solid
     ///     look, following the system appearance). Structural rules
     ///     (radius ≤ 12, accent-as-state, tabular-nums) are not overridable.
-    ///   - config: REST/base-URL configuration. Defaults to staging.
+    ///   - config: REST/base-URL configuration. Defaults to sandbox.
     ///   - onResult: delivered on the main queue with the final
     ///     `PaymentResult` (`.completed` / `.failed` / `.pending` /
     ///     `.canceled`) when the user closes the sheet. Terminal screens
@@ -50,7 +50,7 @@ public enum Zennopay {
         sessionJWT: String,
         refreshSession: (@Sendable (String) async -> String?)? = nil,
         appearance: ZennopayAppearance = .default,
-        config: ZennopayConfig = .staging,
+        config: ZennopayConfig = .sandbox,
         onResult: @escaping (PaymentResult) -> Void
     ) {
         // Fail fast on token problems BEFORE presenting any UI — the host gets
@@ -105,7 +105,7 @@ public enum Zennopay {
     ///     expiry). Given the intent ID, it re-mints a fresh receipt token (or
     ///     returns nil if it can't). When nil, a 401 is surfaced as a failure.
     ///     Mirrors `presentCheckout`'s `refreshSession`.
-    ///   - config: REST/base-URL configuration. Defaults to staging.
+    ///   - config: REST/base-URL configuration. Defaults to sandbox.
     ///   - appearance: partner theming. Defaults to `.default`.
     ///   - onDismiss: invoked on the main queue after the sheet is dismissed
     ///     (the user tapped Done / close, or the token failed to load).
@@ -115,7 +115,7 @@ public enum Zennopay {
         intentID: String,
         receiptToken: String,
         refreshReceiptToken: (@Sendable (String) async -> String?)? = nil,
-        config: ZennopayConfig = .staging,
+        config: ZennopayConfig = .sandbox,
         appearance: ZennopayAppearance = .default,
         onDismiss: @escaping () -> Void
     ) {

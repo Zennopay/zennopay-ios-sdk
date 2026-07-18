@@ -72,7 +72,7 @@ Zennopay.presentCheckout(
         // SAME intent from your backend, or return nil if you can't.
         try? await api.refreshSessionJWT(for: intentID)
     },
-    config: .staging                     // .production for live traffic
+    config: .sandbox                     // .production for live traffic
 ) { result in
     switch result {
     case .completed(let intentID):
@@ -117,7 +117,7 @@ Zennopay.presentReceipt(
         // Called on token expiry (401): re-mint a fresh receipt token, or nil.
         try? await api.mintReceiptToken(for: intentID)
     },
-    config: .staging                     // .production for live traffic
+    config: .sandbox                     // .production for live traffic
 ) {
     // Called after the user taps Done / close (or the token failed to load).
 }
@@ -137,10 +137,14 @@ no existence leak.
 `ZennopayConfig` selects the environment. It is a value, never a code path:
 
 ```swift
-config: .staging       // https://api.staging.zennopay.in — SANDBOX pill shown (default)
+config: .sandbox       // https://api.sandbox.zennopay.in — SANDBOX pill shown (default)
 config: .production    // https://api.zennopay.in — real money, no sandbox chrome
 config: ZennopayConfig(apiBaseURL: URL(string: "http://localhost:3000")!)  // custom gateway
 ```
+
+> `.staging` is **deprecated** — it is a compatibility alias for `.sandbox`
+> (same host, `https://api.sandbox.zennopay.in`). Existing code keeps working;
+> migrate to `.sandbox` at your convenience.
 
 ### Theming
 

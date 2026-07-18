@@ -2,9 +2,34 @@
 
 All notable changes to the Zennopay iOS SDK are documented here.
 
+## 0.6.0 - 2026-07-18
+
+Partner-facing environment names. The config presets now match the docs and API
+reference: **sandbox** and **production**.
+
+### Added
+
+- `ZennopayConfig.sandbox` — `https://api.sandbox.zennopay.in`, the environment
+  partners integrate and test against. This is now the default for
+  `presentCheckout` / `presentReceipt`.
+- `ZennopayConfig.production` — `https://api.zennopay.in`, live money-moving
+  traffic.
+
+### Changed
+
+- `presentCheckout` / `presentReceipt` now default `config:` to `.sandbox`
+  (was `.staging`). Same behavior, partner-facing name.
+
+### Deprecated
+
+- `ZennopayConfig.staging` is deprecated (`@available(*, deprecated, renamed:
+  "sandbox")`) and is now a compatibility alias for `.sandbox` — it points at
+  `https://api.sandbox.zennopay.in` (previously `https://api.staging.zennopay.in`).
+  Existing code keeps compiling; migrate to `.sandbox`.
+
 ## 0.5.0 - 2026-07-18
 
-Version-aligned across all SDKs; API domain zennopay.com → zennopay.in
+Version-aligned across all SDKs; API domain migrated to zennopay.in
 (canonical). No API changes.
 
 ## 0.3.0 - 2026-07-18
