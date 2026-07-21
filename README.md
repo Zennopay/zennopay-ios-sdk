@@ -34,7 +34,7 @@ to your app target. Or, in your own `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/Zennopay/zennopay-ios-sdk", from: "0.5.0")
+    .package(url: "https://github.com/Zennopay/zennopay-ios-sdk", from: "0.7.0")
 ],
 targets: [
     .target(name: "YourApp", dependencies: ["Zennopay"])
