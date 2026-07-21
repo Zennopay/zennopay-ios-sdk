@@ -160,6 +160,12 @@ actor RESTClient {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("Bearer \(sessionJWT)", forHTTPHeaderField: "Authorization")
+        // App identity for the partner's package allowlist (backend migration
+        // 015): the bundle identifier must be registered in the partner's Console
+        // Security tab. Sent on every call so the re-stamped retry keeps it too.
+        if let bundleID = Bundle.main.bundleIdentifier {
+            request.setValue(bundleID, forHTTPHeaderField: "X-Zennopay-Package")
+        }
         if let body {
             request.httpBody = body
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
