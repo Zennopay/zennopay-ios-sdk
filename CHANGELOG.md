@@ -2,6 +2,20 @@
 
 All notable changes to the Zennopay iOS SDK are documented here.
 
+## 0.7.0 - 2026-07-21
+
+Partner package allowlist support. The SDK now identifies the host app to the
+backend so partners can restrict their credentials to registered app bundles.
+
+### Added
+
+- Every REST call (scan/confirm/status) now sends the host app's bundle
+  identifier in the `X-Zennopay-Package` header. Partners register their bundle
+  id in the Console → Developers → Security tab to enable the package allowlist.
+  The header is sent alongside `Authorization`, so the refreshed-token retry
+  carries it too. No-op when the partner hasn't configured an allowlist
+  (enforce-when-configured).
+
 ## 0.6.0 - 2026-07-18
 
 Partner-facing environment names. The config presets now match the docs and API
