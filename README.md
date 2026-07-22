@@ -16,8 +16,12 @@ Full documentation: [Zennopay/zennopay-docs](https://github.com/Zennopay/zennopa
 - iOS 16.0+ (the presented flow uses modern SwiftUI APIs)
 - Swift 5.9+ / Xcode 15+
 - No third-party dependencies
-- A backend session endpoint that creates the payment intent and mints the
-  short-lived session JWT (your API keys never ship in the app)
+- A backend session endpoint that creates the payment intent by calling
+  Zennopay's `POST /v1/payment_intents` (HMAC-signed, server-to-server) and
+  relays the returned Zennopay-minted `session_token` to the sheet — no JWT
+  keypair to generate or register (your API keys never ship in the app). See
+  the [partner-starter](https://github.com/Zennopay/zennopay-partner-starter)
+  (v0.2.0+) for a reference backend.
 
 ## Installation
 
@@ -57,8 +61,9 @@ completable without a camera.
 
 ## Quickstart
 
-Fetch a checkout session (intent id + session JWT) from your backend, then
-present the sheet:
+Ask your backend for a checkout session — it calls Zennopay's
+`POST /v1/payment_intents` (HMAC) and returns the intent id plus the
+Zennopay-minted `session_token` — then present the sheet:
 
 ```swift
 import Zennopay
@@ -68,9 +73,10 @@ Zennopay.presentCheckout(
     intentID: session.intentId,
     sessionJWT: session.sessionJwt,
     refreshSession: { intentID in
-        // Called on session expiry (401): re-mint a fresh JWT for the
-        // SAME intent from your backend, or return nil if you can't.
-        try? await api.refreshSessionJWT(for: intentID)
+        // Called on session expiry (401): ask your backend for a fresh
+        // session_token for the SAME intent (it re-calls Zennopay's session
+        // endpoint), or return nil if you can't.
+        try? await api.refreshSessionToken(for: intentID)
     },
     config: .sandbox                     // .production for live traffic
 ) { result in
@@ -102,8 +108,9 @@ rather than assuming a terminal failure.
 Show the **authoritative** Zennopay receipt for a past payment — with live
 pending/refund status — from anywhere in your app (an order history row, a
 push-notification tap). Mint a short-lived **receipt token** on your backend
-(the same signing key as your session endpoint, but `aud = zennopay-receipt`,
-`sub = <partner_user_id>`, ≤15-min exp — reusable so the SDK can poll) and
+(your partner JWT keypair — the one flow that still uses it, since the session
+token is now Zennopay-minted — with `aud = zennopay-receipt`,
+`sub = <partner_user_id>`, ≤15-min exp, reusable so the SDK can poll) and
 hand it to the app alongside the intent id:
 
 ```swift
